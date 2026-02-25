@@ -1,8 +1,8 @@
 # app.py
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from extensions import db, login_manager
-from models import User, Message, LastRead
+from models import User
 from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
@@ -16,7 +16,12 @@ from tensorflow.keras.applications.efficientnet import preprocess_input as eff_p
 from tensorflow.keras.applications.xception import preprocess_input as xception_preprocess
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
+from flask import make_response
+import pdfkit
 
+PDF_CONFIG = pdfkit.configuration(
+     wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+)
 def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "devkey"
@@ -42,10 +47,6 @@ def create_app():
     def allowed_file(filename):
         return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-   
-    
-
-    
     def load_model_from_folder(folder):
         with open(os.path.join(folder, "config.json"), "r") as f:
             model = model_from_json(f.read())
@@ -58,23 +59,8 @@ def create_app():
         "efficientnet": load_model_from_folder(os.path.join(MODEL_FOLDER, "efficient")),
         "xception": load_model_from_folder(os.path.join(MODEL_FOLDER, "xception")),
        
-    }
-
-   
+    } 
     resnet_path = os.path.join(MODEL_FOLDER, "resnet50_best.keras")
-
-    print("\n🔍 Checking ResNet50 model path:")
-    print(resnet_path)
-
- 
-    if not os.path.exists(resnet_path):
-        raise FileNotFoundError(
-            f"❌ ResNet50 model file NOT FOUND at:\n{resnet_path}"
-        )
-
-    print("✅ ResNet50 model file found.")
-
-
     try:
         resnet_model = tf.keras.models.load_model(resnet_path)
         resnet_model.trainable = False
@@ -111,12 +97,6 @@ def create_app():
         outputs=[last_conv_layer.output, predictions]
     )
 
-   
-
-
- 
-   
-    
     def make_gradcam_heatmap_resnet50(img_array, pred_index=None):
 
         with tf.GradientTape() as tape:
@@ -303,7 +283,36 @@ def create_app():
 
         return np.expand_dims(x, axis=0)  
 
-
+    TUMOR_PRECAUTIONS = {
+    "glioma": [
+        "Consult doctor regularly",
+        "Consult a neuro-oncologist immediately",
+        "Avoid excessive screen exposure",
+        "Maintain adequate sleep and hydration",
+        "Strictly follow MRI follow-up schedule",
+        "Avoid self-medication"
+    ],
+    "meningioma": [
+        "Consult doctor regularly",
+        "Regular imaging follow-up",
+        "Avoid head trauma",
+        "Monitor blood pressure",
+        "Report worsening headaches immediately"
+    ],
+    "pituitary": [
+        "Consult doctor regularly",
+        "Monitor hormonal changes",
+        "Regular endocrinology checkups",
+        "Avoid stress",
+        "Do not ignore vision changes"
+    ],
+    "no_tumor": [
+        "Maintain a healthy lifestyle",
+        "Regular medical checkups",
+        "Balanced diet and exercise"
+    ]
+    }
+    
     
     @login_manager.user_loader
     def load_user(user_id):
@@ -317,125 +326,153 @@ def create_app():
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
+
+            # Check if email already exists
             if User.query.filter_by(email=request.form["email"]).first():
                 flash("Email already registered. Please login.", "danger")
                 return redirect(url_for("register"))
 
+            # Create doctor user (role fixed)
             user = User(
                 username=request.form["username"],
                 email=request.form["email"],
-                role=request.form["role"],
+                role="doctor",
+                hospital=request.form.get("hospital"),
+                experience_years=int(request.form.get("experience_years", 0)),
             )
 
+            # Set password
             user.set_password(request.form["password"])
 
-            if request.form["role"] == "doctor":
-                user.hospital = request.form.get("hospital")
-                user.experience_years = int(request.form.get("experience_years", 0))
-
+            # Save to DB
             db.session.add(user)
             db.session.commit()
-            flash("Registration successful", "success")
+
+            flash("Doctor registration successful", "success")
             return redirect(url_for("login"))
 
         return render_template("register.html")
+
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
             ue = request.form["username_or_email"]
             pw = request.form["password"]
-            role = request.form["role"]
 
             user = User.query.filter(
                 (User.username == ue) | (User.email == ue)
             ).first()
 
-            if not user or not user.check_password(pw) or user.role != role:
-                flash("Invalid credentials", "danger")
+            # Doctor-only validation
+            if not user or not user.check_password(pw) or user.role != "doctor":
+                flash("Invalid doctor credentials", "danger")
                 return redirect(request.url)
 
             login_user(user)
-            return redirect(
-                url_for("patient_dashboard") if role == "patient"
-                else url_for("doctor_dashboard")
-            )
+            return redirect(url_for("doctor_dashboard"))
 
         return render_template("login.html")
 
-    @app.route("/patient")
-    @login_required
-    def patient_dashboard():
-        return render_template("patient_dashboard.html")
-
+    
     @app.route("/doctor")
     @login_required
     def doctor_dashboard():
         return render_template("doctor_dashboard.html")
-
-    @app.route("/find_doctors")
-    @login_required
-    def find_doctors():
-        doctors = User.query.filter_by(role="doctor").all()
-        return render_template("find_doctors.html", doctors=doctors)
-
-    @app.route("/tips")
-    @login_required
-    def tips():
-        return render_template("tips.html")
-
-    @app.route("/send_message/<int:peer_id>", methods=["POST"])
-    @login_required
-    def send_message(peer_id):
-        msg = Message(
-            sender_id=current_user.id,
-            receiver_id=peer_id,
-            content=request.form["content"],
-        )
-        db.session.add(msg)
-        db.session.commit()
-        return redirect(url_for("chat", peer_id=peer_id))
 
     @app.route("/profile")
     @login_required
     def profile():
         return render_template("profile.html")
 
-    @app.route("/chats")
+    @app.route("/diagnostic_report", methods=["POST"])
     @login_required
-    def chats():
-        msgs = Message.query.filter(
-            or_(
-                Message.sender_id == current_user.id,
-                Message.receiver_id == current_user.id,
+    def diagnostic_report():
+
+            tumor_type = request.form.get("label")
+            confidence = request.form.get("confidence")
+            orig_url = request.form.get("orig_url")
+            result_url = request.form.get("result_url")
+            model_used = request.form.get("model_used")
+
+            if not tumor_type or not confidence:
+                    flash("Prediction data missing. Please try again.", "danger")
+                    return redirect(url_for("doctor_dashboard"))
+
+            precautions = TUMOR_PRECAUTIONS.get(
+                    tumor_type.lower(),
+                    ["Consult a medical professional immediately"]
             )
-        ).order_by(Message.timestamp.desc()).all()
 
-        chat_map = {}
-        for msg in msgs:
-            peer_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
-            if peer_id not in chat_map:
-                chat_map[peer_id] = msg
+            return render_template(
+                "report.html",
+                tumor_type=tumor_type,
+                confidence=confidence,
+                orig_url=orig_url,
+                result_url=result_url,
+                model_used=model_used,
+                precautions=precautions,
+                doctor_name=current_user.username,   # ✅ ADD
+                report_date=datetime.now().strftime("%d %B %Y")  # ✅ ADD
+               )
+    
 
-        chats = []
-        for peer_id, last_msg in chat_map.items():
-            peer = User.query.get(peer_id)
-            chats.append({"peer": peer, "last_message": last_msg})
-
-        return render_template("chats.html", chats=chats)
-
-    @app.route("/chat/<int:peer_id>")
+    @app.route("/download_report_pdf", methods=["POST"])
     @login_required
-    def chat(peer_id):
-        peer = User.query.get_or_404(peer_id)
-        messages = Message.query.filter(
-            or_(
-                and_(Message.sender_id == current_user.id, Message.receiver_id == peer_id),
-                and_(Message.sender_id == peer_id, Message.receiver_id == current_user.id),
-            )
-        ).order_by(Message.timestamp.asc()).all()
+    def download_report_pdf():
 
-        return render_template("chat.html", peer=peer, messages=messages)
+        tumor_type = request.form.get("tumor_type")
+        confidence = request.form.get("confidence")
+        orig_url = request.form.get("orig_url")
+        result_url = request.form.get("result_url")
+        orig_url = request.host_url.rstrip("/") + orig_url
+        result_url = request.host_url.rstrip("/") + result_url
+        precautions = TUMOR_PRECAUTIONS.get(
+            tumor_type.lower(), []
+        )
+
+        html = render_template(
+            "report.html",
+            tumor_type=tumor_type,
+            confidence=confidence,
+            orig_url=orig_url,
+            result_url=result_url,
+            precautions=precautions
+        )
+
+        options = {
+           "page-size": "A4",
+           "encoding": "UTF-8",
+
+           "enable-local-file-access": "",
+
+    # 🔥 THESE TWO LINES ARE WHY HEADER IS SHOWING
+           "print-media-type": "",
+           "background": "",
+
+    # 🔥 THIS PREVENTS IMAGES FROM BEING SKIPPED
+           "load-error-handling": "ignore",
+           "load-media-error-handling": "ignore",
+
+           "quiet": ""
+           }
+
+
+        pdf = pdfkit.from_string(
+            html,
+            False,
+            options=options,
+            configuration=PDF_CONFIG
+        )
+
+        response = make_response(pdf)
+        response.headers["Content-Type"] = "application/pdf"
+        response.headers["Content-Disposition"] = (
+            "attachment; filename=diagnostic_report.pdf"
+        )
+
+        return response
+
 
     @app.route("/upload_predict", methods=["POST"])
     @login_required

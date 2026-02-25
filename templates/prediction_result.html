@@ -105,7 +105,8 @@
     }
 
     .image-card img {
-      max-width: 420px;
+      width:220px;
+      /* max-width: 420px; */
       border-radius: 10px;
       box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
@@ -114,6 +115,31 @@
       font-size: 15px;
       color: #444;
     }
+    /* ================= REPORT BUTTON ================= */
+.report-btn-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 50px;
+}
+
+.report-btn {
+  background: linear-gradient(135deg, #20c0a0ff, #139279ff);
+  color: #111111ff;
+  padding: 14px 34px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.25);
+}
+
   </style>
 </head>
 
@@ -161,10 +187,27 @@
           <p class="no-heatmap">Heatmap not generated.</p>
         {% endif %}
       </div>
-
+    
     </div>
 
   </div>
-
+  <!-- REPORT BUTTON -->
+  <div class="report-btn-wrapper">
+    <form method="POST" action="{{ url_for('diagnostic_report') }}">
+  
+      <input type="hidden" name="label" value="{{ label }}">
+      <input type="hidden" name="confidence" value="{{ confidence }}">
+      <input type="hidden" name="orig_url" value="{{ orig_url }}">
+      <input type="hidden" name="result_url" value="{{ result_url }}">
+      <input type="hidden" name="model_used" value="{{ model_used }}">
+  
+      <button type="submit" class="report-btn">
+        Generate Diagnostic Report
+      </button>
+  
+    </form>
+  </div>
+  
+  
 </body>
 </html>

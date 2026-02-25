@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Diagnostic Report | TumorVision</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --header-bg: linear-gradient(135deg, #215472, #e6f2f2);
+      --accent-green: #20c0a0ff;
+      --border-gray: #cfd4da;
+      --card-bg: #f8fafc;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: #ffffff;
+      color: #000000;
+    }
+
+    /* ================= HEADER (UNCHANGED) ================= */
+    .header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      padding: 36px 40px;
+      background: var(--header-bg);
+    }
+
+    .header-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: #131212;
+    }
+
+    .header-center {
+      font-size: 20px;
+      font-weight: 700;
+      color: #131212;
+      text-align: center;
+      position: relative;
+      right: 18px;
+    }
+
+    .header-action a {
+      background: var(--accent-green);
+      color: #003b35;
+      padding: 10px 22px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .header-action a:hover {
+      background: #139279ff;
+    }
+
+    /* ================= PDF BODY ================= */
+    .pdf-container {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 40px;
+      border: 2px solid var(--border-gray);
+      background:var(--header-bg);
+    }
+
+    .pdf-title {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 30px;
+      text-transform: uppercase;
+    }
+
+    .section {
+      background: var(--card-bg);
+      border-left: 6px solid var(--accent-green);
+      padding: 24px 28px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+
+    .section h2 {
+      font-size: 20px;
+      margin-bottom: 14px;
+    }
+
+    /* ================= IMAGES ================= */
+    .images {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      /* flex-wrap: wrap; */
+    }
+
+    .image-box {
+      .images {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+
+  /* 🔥 THIS IS THE KEY LINE */
+  flex-wrap: nowrap;
+}
+
+      text-align: center;
+    }
+
+    .image-box h4 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .image-box img {
+      width: 220px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    /* ================= SUMMARY ================= */
+    .summary p {
+      font-size: 17px;
+      line-height: 1.7;
+      font-weight: 600;
+    }
+
+    /* ================= RECOMMENDATIONS ================= */
+    .recommendations ul {
+      margin-left: 20px;
+    }
+
+    .recommendations li {
+      font-size: 16px;
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+
+    /* ================= DISCLAIMER ================= */
+    .disclaimer {
+      font-size: 12px;
+      margin-top: 30px;
+      color: #555;
+      border-top: 1px solid #ccc;
+      padding-top: 14px;
+    }
+    /* ================= IMAGES ================= */
+.images {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: nowrap;   /* 🔥 forces same line */
+}
+
+.image-box {
+  width: 45%;
+  text-align: center;
+}
+
+.image-box h4 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.image-box img {
+  width: 220px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+    /* ===== Hide UI elements only in PDF ===== */
+/* ===== Hide UI elements only in PDF ===== */
+@media print {
+
+  /* Hide header and buttons in PDF */
+  .header,
+  .header-action,
+  .report-btn {
+    display: none !important;
+  }
+
+  /* Page cleanup */
+  body {
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+
+  /* Keep report border intact */
+  .pdf-container {
+    margin: 0 !important;
+    border: 2px solid #cfd4da !important;
+  }
+
+  /* 🔥 Force images to stay on the same line in PDF */
+  .images {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+  }
+}
+
+
+
+
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER (SAME AS PREDICTION PAGE) -->
+  <div class="header">
+    <div class="header-title">TumorVision</div>
+    <div class="header-center">Diagnostic Report</div>
+    <div class="header-action">
+      <a href="{{ url_for('doctor_dashboard') }}">Back to Dashboard</a>
+    </div>
+  </div>
+
+  <!-- ================= PDF DOCUMENT BODY ================= -->
+  <div class="pdf-container">
+    <div style="text-align:right; margin-bottom:20px;">
+      <form method="POST" action="{{ url_for('download_report_pdf') }}">
+        <input type="hidden" name="tumor_type" value="{{ tumor_type }}">
+        <input type="hidden" name="confidence" value="{{ confidence }}">
+        <input type="hidden" name="orig_url" value="{{ orig_url }}">
+        <input type="hidden" name="result_url" value="{{ result_url }}">
+    
+        <button type="submit" class="report-btn">
+          Download PDF
+        </button>
+      </form>
+    </div>
+    
+      
+    <div class="pdf-title">TumorVision: Diagnostic Document</div>
+
+    <!-- MRI IMAGES -->
+    <div class="section">
+      <h2>MRI Image Analysis</h2>
+      <table width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px;">
+        <tr>
+          <td align="center" width="50%">
+            <h4>Original MRI Scan</h4>
+            <img src="{{ orig_url }}" alt="Original MRI" style="width:220px; border:1px solid #ccc; border-radius:6px;">
+          </td>
+      
+          <td align="center" width="50%">
+            <h4>Grad-CAM Visualization</h4>
+            {% if result_url %}
+            <img src="{{ result_url }}" alt="GradCAM Heatmap" style="width:220px; border:1px solid #ccc; border-radius:6px;">
+            {% else %}
+            <p>No heatmap generated.</p>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+      
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="section summary">
+      <h2>Prediction Summary</h2>
+      <p>
+        <strong>Detected Tumor Type:</strong> {{ tumor_type | capitalize }}<br>
+        <strong>Prediction Confidence:</strong> {{ confidence }}%
+      </p>
+    </div>
+
+    <!-- RECOMMENDATIONS -->
+    <div class="section recommendations">
+      <h2>Medical Interpretation & Recommendations</h2>
+      <ul>
+        {% for tip in precautions %}
+          <li>{{ tip }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- DISCLAIMER -->
+    <div class="disclaimer">
+      ⚠ This diagnostic report is generated using an AI-based system and is intended
+      solely for clinical decision support. Final diagnosis and treatment planning
+      must be performed by a qualified medical professional.
+    </div>
+
+  </div>
+
+</body>
+</html>

@@ -156,24 +156,10 @@
         />
       </label>
 
-      <label class="form-label">
-        Login as
-        <select name="role" id="login-role" required class="form-select">
-          <option value="" disabled selected>Select Role</option>
-          <option value="patient"
-            {% if request.form.get('role') == 'patient' %}selected{% endif %}>
-            Patient
-          </option>
-          <option value="doctor"
-            {% if request.form.get('role') == 'doctor' %}selected{% endif %}>
-            Doctor
-          </option>
-        </select>
-      </label>
-
-      <button type="submit" class="auth-btn" id="login-submit" disabled>
+      <button type="submit" class="auth-btn" id="login-submit">
         Login
       </button>
+
     </form>
 
     <div class="auth-foot">
@@ -183,19 +169,24 @@
 
   </div>
 </div>
-
 <script>
-(function(){
-  const roleSelect = document.getElementById('login-role');
-  const submitBtn = document.getElementById('login-submit');
+  <script>
+(function () {
+  const form = document.getElementById("login-form");
+  const usernameInput = form.querySelector("[name='username_or_email']");
+  const passwordInput = form.querySelector("[name='password']");
 
-  function updateSubmitState() {
-    submitBtn.disabled = !roleSelect.value;
-  }
+  form.addEventListener("submit", function (e) {
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
 
-  document.addEventListener('DOMContentLoaded', updateSubmitState);
-  roleSelect.addEventListener('change', updateSubmitState);
+    if (!username || !password) {
+      e.preventDefault();
+      alert("Please enter both username/email and password.");
+    }
+  });
 })();
 </script>
 
+  </script>
 {% endblock %}
